@@ -1,0 +1,4 @@
+<IfModule LiteSpeed>
+RewriteEngine On
+RewriteRule .* - [E=Cache-Control:no-cache]
+</IfModule>

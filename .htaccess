@@ -1,0 +1,27 @@
+# Shiva Punch Art - Hostinger deployment + cache control
+DirectoryIndex index.php index.html
+
+RewriteEngine On
+# index.html duplicates the home page (index.php); send it to the canonical root URL
+RewriteRule ^index\.html$ / [R=301,L]
+RewriteRule ^about\.php$ about.html [L]
+RewriteRule ^contact\.php$ contact.html [L]
+# Packaging templates page: public URL is packaging-templates.html
+RewriteCond %{THE_REQUEST} \s/gallery\.(html|php)[\s?]
+RewriteRule ^gallery\.(html|php)$ /packaging-templates.html [R=301,L]
+RewriteRule ^packaging-templates\.html$ gallery.php [L]
+RewriteRule ^our-product\.html$ our-product.php [L]
+
+<IfModule mod_headers.c>
+  <FilesMatch "\.(css|js)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate, max-age=0"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
+
+  <FilesMatch "\.(php|html)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate, max-age=0"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
+</IfModule>
