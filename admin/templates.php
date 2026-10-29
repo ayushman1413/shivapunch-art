@@ -100,13 +100,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } elseif (($_POST['action'] ?? '') === 'rename') {
+        // The name shown in admin, the public gallery and the shared link are kept the same: the file is renamed too.
         $id    = (int)($_POST['id'] ?? 0);
         $title = trim($_POST['title'] ?? '');
-        if ($title === '' || mb_strlen($title) > 255) {
+        $st = $pdo->prepare('SELECT file FROM packaging_templates WHERE id=?');
+        $st->execute([$id]);
+        $old = $st->fetchColumn();
+        if (!$old) {
+            $errors[] = 'Image not found.';
+        } elseif ($title === '' || mb_strlen($title) > 255) {
             $errors[] = 'Template name is required (max 255 characters).';
         } else {
-            $pdo->prepare('UPDATE packaging_templates SET title=? WHERE id=?')->execute([$title, $id]);
-            back_to($filter, 'renamed');
+            $new = $old;
+            if (strpos($old, '/') === false && is_file($dir . $old)) {
+                $ext = pathinfo($old, PATHINFO_EXTENSION);
+                $new = upload_name($dir, preg_replace('/\.(jpe?g|png|webp|gif)$/i', '', $title) . '.' . $ext, $old);
+            }
+            if ($new !== $old && !rename($dir . $old, $dir . $new)) {
+                $errors[] = 'Could not rename the file.';
+            } else {
+                try {
+                    $pdo->prepare('UPDATE packaging_templates SET title=?, file=? WHERE id=?')->execute([$title, $new, $id]);
+                } catch (Throwable $e) {
+                    if ($new !== $old) { rename($dir . $new, $dir . $old); }
+                    throw $e;
+                }
+                back_to($filter, 'renamed');
+            }
         }
     } elseif (($_POST['action'] ?? '') === 'delete_category') {
         $id = (int)($_POST['id'] ?? 0);
@@ -257,11 +277,11 @@ require 'header.php';
   <div class="tc-card">
     <input type="checkbox" class="pick" name="ids[]" value="<?= (int)$r['id'] ?>" form="moveForm" aria-label="Select image">
     <img src="<?= htmlspecialchars((strpos($r['file'], '/') === false ? '../templates-files/' : '../') . $r['file']) ?>" style="width:100%;height:140px;object-fit:cover;border-radius:8px">
-    <form method="post" style="display:flex;gap:6px;margin:6px 0 0">
+    <form method="post" style="display:flex;flex-direction:column;gap:6px;margin:6px 0 0">
       <input type="hidden" name="action" value="rename">
       <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
-      <input type="text" name="title" value="<?= h($r['title']) ?>" maxlength="255" required aria-label="Template name" style="flex:1;min-width:0;padding:7px 8px;border:1px solid #e6ecf7;border-radius:8px;font-size:13px">
-      <button type="submit" style="padding:0 10px;border:0;border-radius:8px;color:#fff;font-weight:700;cursor:pointer;background:#16a34a">Rename</button>
+      <input type="text" name="title" value="<?= h($r['title']) ?>" maxlength="255" required aria-label="Template name" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #e6ecf7;border-radius:8px;font-size:13px">
+      <button type="submit" style="padding:8px 0;border:0;border-radius:8px;color:#fff;font-weight:700;cursor:pointer;background:#16a34a">Rename</button>
     </form>
     <div style="display:flex;gap:6px;margin-top:6px">
       <form method="post" enctype="multipart/form-data" style="flex:1;margin:0">

@@ -35,14 +35,14 @@ function default_status($pdo){
 }
 
 // Keeps the name the admin uploaded (made URL-safe); adds -2, -3... only if that name is already taken.
-function upload_name($dir, $original){
+function upload_name($dir, $original, $keep = null){
     $ext  = strtolower(pathinfo($original, PATHINFO_EXTENSION));
     $base = preg_replace('/[^A-Za-z0-9._-]+/', '-', pathinfo($original, PATHINFO_FILENAME));
     $base = trim(preg_replace('/\.{2,}/', '.', $base), '-._');
     if ($base === '') { $base = 'image'; }
     $base = substr($base, 0, 100);
     $name = "$base.$ext";
-    for ($n = 2; file_exists(rtrim($dir, '/') . '/' . $name); $n++) { $name = "$base-$n.$ext"; }
+    for ($n = 2; $name !== $keep && file_exists(rtrim($dir, '/') . '/' . $name); $n++) { $name = "$base-$n.$ext"; }
     return $name;
 }
 
