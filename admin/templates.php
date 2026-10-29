@@ -82,6 +82,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 back_to((int)$pdo->lastInsertId(), 'category created');
             }
         }
+    } elseif (($_POST['action'] ?? '') === 'rename_category') {
+        $id   = (int)($_POST['id'] ?? 0);
+        $name = trim($_POST['name'] ?? '');
+        if (!category_exists($pdo, $id)) {
+            $errors[] = 'Category not found.';
+        } elseif ($name === '' || mb_strlen($name) > 100) {
+            $errors[] = 'Category name is required (max 100 characters).';
+        } else {
+            $st = $pdo->prepare('SELECT 1 FROM template_categories WHERE name=? AND id<>?');
+            $st->execute([$name, $id]);
+            if ($st->fetchColumn()) {
+                $errors[] = 'A category with this name already exists.';
+            } else {
+                $pdo->prepare('UPDATE template_categories SET name=? WHERE id=?')->execute([$name, $id]);
+                back_to($filter, 'category renamed');
+            }
+        }
+    } elseif (($_POST['action'] ?? '') === 'rename') {
+        $id    = (int)($_POST['id'] ?? 0);
+        $title = trim($_POST['title'] ?? '');
+        if ($title === '' || mb_strlen($title) > 255) {
+            $errors[] = 'Template name is required (max 255 characters).';
+        } else {
+            $pdo->prepare('UPDATE packaging_templates SET title=? WHERE id=?')->execute([$title, $id]);
+            back_to($filter, 'renamed');
+        }
     } elseif (($_POST['action'] ?? '') === 'delete_category') {
         $id = (int)($_POST['id'] ?? 0);
         $pdo->prepare('UPDATE packaging_templates SET category_id=NULL WHERE category_id=?')->execute([$id]);
@@ -183,15 +209,25 @@ require 'header.php';
   <input type="hidden" name="action" value="add_category">
   <input type="text" name="name" placeholder="New category name" maxlength="100" required>
   <button type="submit" class="tc-btn">Create category</button>
-  <?php if ($curName !== null): ?>
-    <button type="submit" form="delCat" class="tc-btn" style="background:#dc2626;margin-left:auto">Delete “<?= h($curName) ?>”</button>
-  <?php endif; ?>
 </form>
+
 <?php if ($curName !== null): ?>
-<form method="post" id="delCat" onsubmit="return confirm('Delete this category? Its images are kept and become Uncategorized.')">
-  <input type="hidden" name="action" value="delete_category">
-  <input type="hidden" name="id" value="<?= (int)$filter ?>">
-</form>
+<div class="tc-box">
+  <b>Manage category “<?= h($curName) ?>”</b>
+  <form method="post" style="display:flex;gap:10px;margin:0">
+    <input type="hidden" name="action" value="rename_category">
+    <input type="hidden" name="id" value="<?= (int)$filter ?>">
+    <input type="text" name="name" value="<?= h($curName) ?>" maxlength="100" required aria-label="Category name">
+    <button type="submit" class="tc-btn">Rename</button>
+  </form>
+  <form method="post" style="margin:0 0 0 auto" onsubmit="return confirm('Delete this category? Its images are kept and become Uncategorized.')">
+    <input type="hidden" name="action" value="delete_category">
+    <input type="hidden" name="id" value="<?= (int)$filter ?>">
+    <button type="submit" class="tc-btn" style="background:#dc2626">Delete category</button>
+  </form>
+</div>
+<?php elseif ($cats): ?>
+<p style="color:#64748b;font-size:13px">Open a category tab above to rename or delete it.</p>
 <?php endif; ?>
 
 <form method="post" enctype="multipart/form-data" style="margin:16px 0">
@@ -221,6 +257,12 @@ require 'header.php';
   <div class="tc-card">
     <input type="checkbox" class="pick" name="ids[]" value="<?= (int)$r['id'] ?>" form="moveForm" aria-label="Select image">
     <img src="<?= htmlspecialchars((strpos($r['file'], '/') === false ? '../templates-files/' : '../') . $r['file']) ?>" style="width:100%;height:140px;object-fit:cover;border-radius:8px">
+    <form method="post" style="display:flex;gap:6px;margin:6px 0 0">
+      <input type="hidden" name="action" value="rename">
+      <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+      <input type="text" name="title" value="<?= h($r['title']) ?>" maxlength="255" required aria-label="Template name" style="flex:1;min-width:0;padding:7px 8px;border:1px solid #e6ecf7;border-radius:8px;font-size:13px">
+      <button type="submit" style="padding:0 10px;border:0;border-radius:8px;color:#fff;font-weight:700;cursor:pointer;background:#16a34a">Rename</button>
+    </form>
     <div style="display:flex;gap:6px;margin-top:6px">
       <form method="post" enctype="multipart/form-data" style="flex:1;margin:0">
         <input type="hidden" name="action" value="replace">
